@@ -1,9 +1,19 @@
-function App() {
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import UploadPage from "./pages/UploadPage";
+import ResultPage from "./pages/ResultPage";
+
+const queryClient = new QueryClient();
+
+export default function App() {
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <h1 className="text-2xl font-bold p-8">Handwriting OCR</h1>
-    </div>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<UploadPage />} />
+          <Route path="/result" element={<ResultPage />} />
+        </Routes>
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 }
-
-export default App;
