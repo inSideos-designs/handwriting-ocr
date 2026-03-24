@@ -1,0 +1,50 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Model checkpoints
+model/checkpoints/
+*.pt
+*.pth
+*.onnx
+
+# Data
+data/
+*.csv
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+
+# Node
+node_modules/
+frontend/dist/
+
+# Docker
+.docker/
+
+# Dagster
+dagster_home/
+.dagster/
+
+# Jupyter
+.ipynb_checkpoints/
