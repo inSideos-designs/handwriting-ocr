@@ -1,0 +1,65 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "8000:8000"
+    environment:
+      - MODEL_CHECKPOINT=/app/checkpoints/best_model.pt
+      - MODEL_HIDDEN_SIZE=256
+      - MODEL_NUM_LSTM_LAYERS=2
+    volumes:
+      - model-checkpoints:/app/checkpoints
+      - uploads:/app/uploads
+    depends_on:
+      - redis
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+  dagster-webserver:
+    build:
+      context: .
+      dockerfile: Dockerfile.dagster
+    command: dagster-webserver -h 0.0.0.0 -p 3001 -m orchestration.definitions
+    ports:
+      - "3001:3001"
+    environment:
+      - DAGSTER_HOME=/app/dagster_home
+      - KAGGLE_CSV_PATH=/app/data/written_name_train_v2.csv
+      - KAGGLE_IMG_DIR=/app/data/train_v2/train
+      - CHECKPOINT_DIR=/app/checkpoints
+    volumes:
+      - model-checkpoints:/app/checkpoints
+      - dagster-storage:/app/dagster_home
+
+  dagster-daemon:
+    build:
+      context: .
+      dockerfile: Dockerfile.dagster
+    command: dagster-daemon run
+    environment:
+      - DAGSTER_HOME=/app/dagster_home
+      - KAGGLE_CSV_PATH=/app/data/written_name_train_v2.csv
+      - KAGGLE_IMG_DIR=/app/data/train_v2/train
+      - CHECKPOINT_DIR=/app/checkpoints
+    volumes:
+      - model-checkpoints:/app/checkpoints
+      - dagster-storage:/app/dagster_home
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+volumes:
+  model-checkpoints:
+  uploads:
+  dagster-storage:
