@@ -1,3 +1,7 @@
+import os
+
+os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
+
 import torch
 import numpy as np
 from PIL import Image
@@ -10,7 +14,12 @@ from model.training.config import TrainConfig
 
 class Predictor:
     def __init__(self, checkpoint_path: str, config: TrainConfig):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        if torch.cuda.is_available():
+            self.device = torch.device("cuda")
+        elif torch.backends.mps.is_available():
+            self.device = torch.device("mps")
+        else:
+            self.device = torch.device("cpu")
         self.model = CRNN(
             img_height=config.img_height,
             num_channels=1,
