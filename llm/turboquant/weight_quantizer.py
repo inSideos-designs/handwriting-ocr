@@ -58,30 +58,35 @@ class QuantizedLinear(nn.Module):
         return ql
 
     def _quantize_weights(self, weight):
-        """Quantize weight matrix row by row."""
+        """Quantize weight matrix (vectorized over all rows)."""
         with torch.no_grad():
-            for i in range(self.out_features):
-                row = weight[i].float()
-                norm = torch.norm(row)
-                self.weight_norms[i] = norm.half()
+            w = weight.float()
+            norms = torch.norm(w, dim=1)
+            self.weight_norms = norms.half()
 
-                if norm > 1e-8:
-                    unit_row = row / norm
-                    indices = self.quantizer.quantize(unit_row)
-                    self.weight_indices[i] = indices.to(torch.int8)
+            # Normalize rows to unit length
+            safe_norms = norms.clone()
+            safe_norms[safe_norms < 1e-8] = 1.0
+            unit_w = w / safe_norms.unsqueeze(1)
+
+            # Rotate all rows at once: (out, in) @ (in, in)^T = (out, in)
+            rotated = unit_w @ self.quantizer.rotation.T
+
+            # Quantize: find nearest centroid for each coordinate
+            centroids = self.quantizer.centroids
+            distances = torch.abs(rotated.unsqueeze(-1) - centroids.unsqueeze(0).unsqueeze(0))
+            indices = torch.argmin(distances, dim=-1)
+            self.weight_indices = indices.to(torch.int8)
 
         self._quantized = True
 
     def _dequantize_weights(self):
-        """Reconstruct full weight matrix from quantized representation."""
-        weight = torch.zeros(self.out_features, self.in_features,
-                             device=self.weight_indices.device)
-
-        for i in range(self.out_features):
-            indices = self.weight_indices[i].long()
-            unit_row = self.quantizer.dequantize(indices)
-            weight[i] = unit_row * self.weight_norms[i].float()
-
+        """Reconstruct full weight matrix (vectorized)."""
+        indices = self.weight_indices.long()
+        centroids = self.quantizer.centroids.to(self.weight_indices.device)
+        y_hat = centroids[indices]  # (out, in)
+        weight = y_hat @ self.quantizer.rotation.to(self.weight_indices.device)
+        weight = weight * self.weight_norms.float().unsqueeze(1)
         return weight
 
     def forward(self, x):
