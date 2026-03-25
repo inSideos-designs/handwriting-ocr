@@ -10,9 +10,34 @@ from model.training.config import TrainConfig
 from model.training.trainer import Trainer
 
 
+K8S_GPU_CONFIG = {
+    "dagster-k8s/config": {
+        "container_config": {
+            "resources": {
+                "requests": {"nvidia.com/gpu": "1", "memory": "8Gi", "cpu": "3"},
+                "limits": {"nvidia.com/gpu": "1", "memory": "12Gi", "cpu": "4"},
+            },
+        },
+        "pod_spec_config": {
+            "node_selector": {
+                "cloud.google.com/gke-accelerator": "nvidia-tesla-t4",
+            },
+            "tolerations": [
+                {
+                    "key": "nvidia.com/gpu",
+                    "operator": "Exists",
+                    "effect": "NoSchedule",
+                }
+            ],
+        },
+    }
+}
+
+
 @dagster.asset(
     deps=["cleaned_dataset"],
     description="Train CRNN model on cleaned handwriting dataset",
+    op_tags=K8S_GPU_CONFIG,
 )
 def trained_model(context: dagster.AssetExecutionContext) -> dict:
     gcs_bucket = os.environ.get("GCS_BUCKET", "")
