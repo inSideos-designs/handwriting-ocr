@@ -57,7 +57,10 @@ runLauncher:
         - LEARNING_RATE=0.001
         - NUM_EPOCHS=50
         - CHECKPOINT_DIR=/tmp/checkpoints
-      jobImage: "us-central1-docker.pkg.dev/doc-processing-hw-ocr/handwriting-ocr/dagster:latest"
+      image:
+        repository: "us-central1-docker.pkg.dev/doc-processing-hw-ocr/handwriting-ocr/dagster"
+        tag: "latest"
+        pullPolicy: Always
       imagePullPolicy: Always
 
 postgresql:
