@@ -1,0 +1,74 @@
+dagster-user-deployments:
+  enabled: true
+  deployments:
+    - name: handwriting-ocr
+      image:
+        repository: us-central1-docker.pkg.dev/document-processing/handwriting-ocr/dagster
+        tag: latest
+        pullPolicy: Always
+      dagsterApiGrpcArgs:
+        - "-m"
+        - "orchestration.definitions"
+      port: 3030
+      envSecrets: []
+      envConfigMaps: []
+      env:
+        GCS_BUCKET: "gs://document-processing-ml"
+        BATCH_SIZE: "64"
+        LEARNING_RATE: "0.001"
+        NUM_EPOCHS: "50"
+        CHECKPOINT_DIR: "/tmp/checkpoints"
+      resources:
+        requests:
+          memory: "512Mi"
+          cpu: "250m"
+        limits:
+          memory: "1Gi"
+          cpu: "500m"
+
+dagsterWebserver:
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+  service:
+    type: LoadBalancer
+    port: 3001
+
+dagsterDaemon:
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+
+runLauncher:
+  type: K8sRunLauncher
+  config:
+    k8sRunLauncher:
+      envVars:
+        - GCS_BUCKET=gs://document-processing-ml
+        - BATCH_SIZE=64
+        - LEARNING_RATE=0.001
+        - NUM_EPOCHS=50
+        - CHECKPOINT_DIR=/tmp/checkpoints
+      runK8sConfig:
+        containerConfig:
+          image:
+            repository: us-central1-docker.pkg.dev/document-processing/handwriting-ocr/dagster
+            tag: latest
+            pullPolicy: Always
+
+postgresql:
+  enabled: true
+  postgresqlPassword: dagster
+  persistence:
+    size: 2Gi
+
+ingress:
+  enabled: false
