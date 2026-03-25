@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_ID="document-processing"
+PROJECT_ID="doc-processing-hw-ocr"
 REGION="us-central1"
 ZONE="us-central1-a"
 CLUSTER_NAME="handwriting-ocr-cluster"
-BUCKET_NAME="document-processing-ml"
+BUCKET_NAME="doc-processing-hw-ocr-ml"
 REPO_NAME="handwriting-ocr"
 
 echo "Step 1: Create GCP project"

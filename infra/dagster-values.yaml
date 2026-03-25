@@ -3,7 +3,7 @@ dagster-user-deployments:
   deployments:
     - name: handwriting-ocr
       image:
-        repository: us-central1-docker.pkg.dev/document-processing/handwriting-ocr/dagster
+        repository: us-central1-docker.pkg.dev/doc-processing-hw-ocr/handwriting-ocr/dagster
         tag: latest
         pullPolicy: Always
       dagsterApiGrpcArgs:
@@ -13,7 +13,7 @@ dagster-user-deployments:
       envSecrets: []
       envConfigMaps: []
       env:
-        GCS_BUCKET: "gs://document-processing-ml"
+        GCS_BUCKET: "gs://doc-processing-hw-ocr-ml"
         BATCH_SIZE: "64"
         LEARNING_RATE: "0.001"
         NUM_EPOCHS: "50"
@@ -52,7 +52,7 @@ runLauncher:
   config:
     k8sRunLauncher:
       envVars:
-        - GCS_BUCKET=gs://document-processing-ml
+        - GCS_BUCKET=gs://doc-processing-hw-ocr-ml
         - BATCH_SIZE=64
         - LEARNING_RATE=0.001
         - NUM_EPOCHS=50
@@ -60,7 +60,7 @@ runLauncher:
       runK8sConfig:
         containerConfig:
           image:
-            repository: us-central1-docker.pkg.dev/document-processing/handwriting-ocr/dagster
+            repository: us-central1-docker.pkg.dev/doc-processing-hw-ocr/handwriting-ocr/dagster
             tag: latest
             pullPolicy: Always
 
