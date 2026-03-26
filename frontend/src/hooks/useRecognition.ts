@@ -1,9 +1,9 @@
 import { useMutation } from "@tanstack/react-query";
-import { recognizeImage } from "../services/api";
-import type { RecognitionResult } from "../services/api";
+import { recognizePage } from "../services/api";
+import type { PageRecognitionResult } from "../services/api";
 
 export function useRecognition() {
-  return useMutation<RecognitionResult, Error, File>({
-    mutationFn: recognizeImage,
+  return useMutation<PageRecognitionResult, Error, File>({
+    mutationFn: recognizePage,
   });
 }
