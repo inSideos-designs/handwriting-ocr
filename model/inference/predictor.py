@@ -38,8 +38,14 @@ class Predictor:
         text, _ = self.predict_with_confidence(img)
         return text
 
-    def predict_with_confidence(self, img: Image.Image) -> tuple[str, float]:
-        tensor = preprocess_image(img).unsqueeze(0).to(self.device)
+    def predict_with_confidence(self, img: Image.Image, target_width: int = None) -> tuple[str, float]:
+        # Auto-detect width: use wider format for wide images (line-level)
+        if target_width is None:
+            w, h = img.size
+            aspect = w / max(h, 1)
+            target_width = 512 if aspect > 3 else 128
+
+        tensor = preprocess_image(img, target_width=target_width).unsqueeze(0).to(self.device)
 
         with torch.no_grad():
             output = self.model(tensor)
