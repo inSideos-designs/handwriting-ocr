@@ -33,7 +33,7 @@ def normalize_image(img: Image.Image) -> torch.Tensor:
     return tensor
 
 
-def preprocess_image(img: Image.Image) -> torch.Tensor:
+def preprocess_image(img: Image.Image, target_width: int = IMG_WIDTH) -> torch.Tensor:
     img = convert_to_grayscale(img)
-    img = resize_and_pad(img)
+    img = resize_and_pad(img, target_width=target_width)
     return normalize_image(img)
