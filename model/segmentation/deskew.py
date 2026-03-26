@@ -85,16 +85,30 @@ def deskew(gray, angle=None):
 
 
 def binarize(gray):
-    """Apply adaptive binarization to a grayscale image."""
-    # Gaussian blur to reduce noise
-    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+    """Apply binarization to a grayscale image. Tries multiple strategies."""
+    # Enhance contrast with CLAHE
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    enhanced = clahe.apply(gray)
 
-    # Adaptive threshold (works well on lined paper, uneven lighting)
-    binary = cv2.adaptiveThreshold(
+    # Gaussian blur to reduce noise
+    blurred = cv2.GaussianBlur(enhanced, (3, 3), 0)
+
+    # Try Otsu first
+    _, otsu = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    otsu_ratio = np.sum(otsu > 0) / otsu.size
+
+    # Try adaptive threshold
+    adaptive = cv2.adaptiveThreshold(
         blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
         cv2.THRESH_BINARY_INV, blockSize=31, C=10
     )
-    return binary
+    adaptive_ratio = np.sum(adaptive > 0) / adaptive.size
+
+    # Use whichever gives a more reasonable ink ratio (target: 1-20%)
+    otsu_score = abs(otsu_ratio - 0.05)
+    adaptive_score = abs(adaptive_ratio - 0.05)
+
+    return otsu if otsu_score < adaptive_score else adaptive
 
 
 def remove_lines(binary):
@@ -123,19 +137,36 @@ def remove_lines(binary):
     return cleaned
 
 
-def preprocess_page(img):
+def preprocess_page(img, max_width=1200):
     """
     Full preprocessing pipeline for a page image.
 
     Args:
         img: PIL Image
+        max_width: resize images wider than this for performance
 
     Returns:
         binary: numpy array (binary, text=white, bg=black)
         gray_deskewed: numpy array (grayscale, deskewed)
     """
     gray = pil_to_cv2(img)
+
+    # Resize large images for performance
+    h, w = gray.shape[:2]
+    if w > max_width:
+        scale = max_width / w
+        gray = cv2.resize(gray, (max_width, int(h * scale)), interpolation=cv2.INTER_AREA)
+
     gray_deskewed = deskew(gray)
     binary = binarize(gray_deskewed)
+
+    # Check if line removal helps or hurts (compare white pixel ratios)
     cleaned = remove_lines(binary)
+    white_ratio_before = np.sum(binary > 0) / binary.size
+    white_ratio_after = np.sum(cleaned > 0) / cleaned.size
+
+    # If line removal removed too much (>80% of ink), skip it
+    if white_ratio_after < white_ratio_before * 0.2:
+        return binary, gray_deskewed
+
     return cleaned, gray_deskewed

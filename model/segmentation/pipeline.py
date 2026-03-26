@@ -22,6 +22,32 @@ class PageRecognizer:
             config = TrainConfig()
         self.predictor = Predictor(checkpoint_path, config)
 
+    def _try_orientation(self, img):
+        """
+        Try all 4 rotations and pick the one that produces the best segmentation.
+        Best = most lines with reasonable word counts.
+        """
+        best_result = None
+        best_score = -1
+
+        for angle in [0, 90, 180, 270]:
+            rotated = img.rotate(angle, expand=True) if angle != 0 else img
+            binary, gray = preprocess_page(rotated)
+            lines = extract_lines(binary)
+
+            # Score: prefer orientations with multiple lines containing 1-5 words each
+            score = 0
+            for line_img in lines:
+                words = extract_words(line_img)
+                if 1 <= len(words) <= 10:
+                    score += len(words)
+
+            if score > best_score:
+                best_score = score
+                best_result = (binary, gray, rotated)
+
+        return best_result
+
     def recognize(self, img):
         """
         Recognize all text in a page image.
@@ -35,8 +61,15 @@ class PageRecognizer:
                 - "lines": list of line dicts, each with "text", "words"
                 - "words": each word has "text", "confidence"
         """
-        # Preprocess
-        binary, gray_deskewed = preprocess_page(img)
+        # Apply EXIF rotation if present
+        from PIL import ImageOps
+        try:
+            img = ImageOps.exif_transpose(img)
+        except Exception:
+            pass
+
+        # Try all orientations and pick the best
+        binary, gray_deskewed, img = self._try_orientation(img)
 
         # Extract lines
         line_images = extract_lines(binary)
