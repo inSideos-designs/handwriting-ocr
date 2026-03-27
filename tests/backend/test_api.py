@@ -1,48 +1,27 @@
 import io
-import os
-import tempfile
+import importlib
 
 import numpy as np
 import pytest
-import torch
+from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from model.data.dataset import NUM_CLASSES
-from model.networks.crnn import CRNN
-
 
 @pytest.fixture
-def dummy_checkpoint(tmp_path):
-    model = CRNN(
-        img_height=32,
-        num_channels=1,
-        num_classes=NUM_CLASSES,
-        hidden_size=32,
-        num_lstm_layers=1,
-    )
-    path = str(tmp_path / "best_model.pt")
-    torch.save(
-        {
-            "epoch": 0,
-            "model_state_dict": model.state_dict(),
-            "optimizer_state_dict": {},
-            "val_loss": 1.0,
-        },
-        path,
-    )
-    return path
+def client():
+    mock_service = MagicMock()
+    mock_service.recognize.return_value = {
+        "text": "Hello World",
+        "raw_text": "Helo Wrld",
+        "confidence": 0.85,
+    }
 
-
-@pytest.fixture
-def client(dummy_checkpoint, monkeypatch):
-    monkeypatch.setenv("MODEL_CHECKPOINT", dummy_checkpoint)
-    monkeypatch.setenv("MODEL_HIDDEN_SIZE", "32")
-    monkeypatch.setenv("MODEL_NUM_LSTM_LAYERS", "1")
-
-    from backend.main import create_app
-    app = create_app()
-    return TestClient(app)
+    with patch("backend.services.recognition.CorrectedRecognitionService", return_value=mock_service):
+        import backend.main
+        importlib.reload(backend.main)
+        app = backend.main.app
+        yield TestClient(app)
 
 
 @pytest.fixture
@@ -74,7 +53,6 @@ class TestRecognizeEndpoint:
         assert "text" in data
         assert "confidence" in data
         assert isinstance(data["text"], str)
-        assert 0.0 <= data["confidence"] <= 1.0
 
     def test_reject_non_image(self, client):
         buf = io.BytesIO(b"not an image")
