@@ -1,21 +1,23 @@
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass
 class AppConfig:
-    model_checkpoint: str = ""
-    model_hidden_size: int = 0
-    model_num_lstm_layers: int = 0
+    trocr_model: str = ""
+    corrector_model: str = ""
+    corrector_enabled: bool = True
     max_file_size: int = 10 * 1024 * 1024
     allowed_types: tuple = ("image/png", "image/jpeg", "image/jpg", "image/tiff", "image/bmp")
 
     def __post_init__(self):
-        if not self.model_checkpoint:
-            self.model_checkpoint = os.environ.get(
-                "MODEL_CHECKPOINT", "model/checkpoints/best_model.pt"
+        if not self.trocr_model:
+            self.trocr_model = os.environ.get(
+                "TROCR_MODEL", "microsoft/trocr-large-handwritten"
             )
-        if not self.model_hidden_size:
-            self.model_hidden_size = int(os.environ.get("MODEL_HIDDEN_SIZE", "256"))
-        if not self.model_num_lstm_layers:
-            self.model_num_lstm_layers = int(os.environ.get("MODEL_NUM_LSTM_LAYERS", "2"))
+        if not self.corrector_model:
+            self.corrector_model = os.environ.get(
+                "CORRECTOR_MODEL", "llm/checkpoints/ocr-corrector"
+            )
+        env_enabled = os.environ.get("CORRECTOR_ENABLED", "true")
+        self.corrector_enabled = env_enabled.lower() not in ("false", "0", "no")
