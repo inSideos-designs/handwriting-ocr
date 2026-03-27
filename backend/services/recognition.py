@@ -1,17 +1,15 @@
 from PIL import Image
 
-from model.inference.trocr_predictor import TrOCRPredictor
-from model.segmentation.pipeline import PageRecognizer
+from model.inference.surya_predictor import SuryaPredictor
 from llm.inference.corrector import OCRCorrector
 from backend.core.config import AppConfig
 
 
 class CorrectedRecognitionService:
-    """Two-stage recognition: TrOCR for OCR, then Gemma for error correction."""
+    """Two-stage recognition: Surya OCR, then Gemma for error correction."""
 
     def __init__(self, app_config: AppConfig):
-        self.predictor = TrOCRPredictor(model_name=app_config.trocr_model)
-        self.page_recognizer = PageRecognizer(predictor=self.predictor)
+        self.predictor = SuryaPredictor()
 
         if app_config.corrector_enabled:
             self.corrector = OCRCorrector(model_path=app_config.corrector_model)
@@ -33,7 +31,7 @@ class CorrectedRecognitionService:
         }
 
     def recognize_page(self, img: Image.Image) -> dict:
-        result = self.page_recognizer.recognize(img)
+        result = self.predictor.predict_page(img)
 
         for line in result.get("lines", []):
             line["raw_text"] = line["text"]
