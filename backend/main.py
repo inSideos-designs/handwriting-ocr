@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.api.routes import router, init_service
 from backend.core.config import AppConfig
-from backend.services.recognition import RecognitionService
+from backend.services.recognition import CorrectedRecognitionService
 
 
 def create_app() -> FastAPI:
@@ -18,7 +18,7 @@ def create_app() -> FastAPI:
     )
 
     config = AppConfig()
-    service = RecognitionService(config)
+    service = CorrectedRecognitionService(config)
     init_service(service)
 
     app.include_router(router)

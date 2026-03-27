@@ -3,13 +3,13 @@ import io
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from PIL import Image
 
-from backend.services.recognition import RecognitionService
+from backend.services.recognition import CorrectedRecognitionService
 
 router = APIRouter(prefix="/api")
-_service: RecognitionService | None = None
+_service: CorrectedRecognitionService | None = None
 
 
-def init_service(service: RecognitionService) -> None:
+def init_service(service: CorrectedRecognitionService) -> None:
     global _service
     _service = service
 
