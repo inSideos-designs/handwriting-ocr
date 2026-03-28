@@ -4,38 +4,44 @@ import torch
 from torch.utils.data import DataLoader
 from transformers import AutoModelForCausalLM, AutoTokenizer, get_linear_schedule_with_warmup
 
-from llm.finetune.dataset import OCRCorrectionDataset, generate_training_pairs, corrupt_text
-
-
-# Common English names for training data generation
-SAMPLE_NAMES = [
-    "BALTHAZAR", "SIMON", "ELIZABETH", "WILLIAM", "CATHERINE",
-    "ALEXANDER", "MARGARET", "BENJAMIN", "CHARLOTTE", "NATHANIEL",
-    "VICTORIA", "THEODORE", "JOSEPHINE", "CHRISTOPHER", "ANASTASIA",
-    "MONTGOMERY", "KATHERINE", "FREDERICK", "GENEVIEVE", "SEBASTIAN",
-    "ISABELLE", "MAXIMILIAN", "PENELOPE", "ARCHIBALD", "ROSALIND",
-    "BARTHOLOMEW", "EVANGELINE", "CORNELIUS", "HENRIETTA", "AUGUSTINE",
-    "SMITH", "JOHNSON", "WILLIAMS", "BROWN", "JONES",
-    "GARCIA", "MILLER", "DAVIS", "RODRIGUEZ", "MARTINEZ",
-    "HERNANDEZ", "LOPEZ", "GONZALEZ", "WILSON", "ANDERSON",
-    "THOMAS", "TAYLOR", "MOORE", "JACKSON", "MARTIN",
-    "HELLO", "WORLD", "TEST", "DOCUMENT", "PROCESSING",
-    "HANDWRITING", "RECOGNITION", "NEURAL", "NETWORK", "MACHINE",
-]
+from llm.finetune.dataset import (
+    OCRCorrectionDataset,
+    generate_training_pairs,
+    generate_real_ocr_pairs,
+    SENTENCE_CORPUS,
+)
 
 
 def train_corrector(
-    model_name="TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+    model_name="google/gemma-2-2b-it",
     output_dir="llm/checkpoints",
     num_epochs=3,
     batch_size=4,
     learning_rate=2e-4,
     max_length=128,
-    num_augmentations=5,
+    num_augmentations=10,
     error_rate=0.15,
+    real_ocr_pairs=None,
     device=None,
 ):
-    """Fine-tune a causal LM for OCR error correction using LoRA-style training."""
+    """
+    Fine-tune a causal LM for OCR error correction.
+
+    Uses synthetic corrupted text pairs + optional real OCR error pairs.
+    Only trains last 2 transformer layers + lm_head for efficiency.
+
+    Args:
+        model_name: HuggingFace model ID
+        output_dir: directory to save checkpoint
+        num_epochs: training epochs
+        batch_size: batch size
+        learning_rate: learning rate
+        max_length: max token length
+        num_augmentations: synthetic corruptions per sentence
+        error_rate: corruption probability per character
+        real_ocr_pairs: list of (ocr_output, ground_truth) tuples from real OCR
+        device: torch device
+    """
     if device is None:
         if torch.cuda.is_available():
             device = "cuda"
@@ -55,11 +61,10 @@ def train_corrector(
         model_name, dtype=torch.float32
     ).to(device)
 
-    # Freeze all parameters except the last 2 transformer layers
+    # Freeze all parameters except the last 2 transformer layers + lm_head
     for param in model.parameters():
         param.requires_grad = False
 
-    # Unfreeze last 2 layers
     layers = None
     if hasattr(model, "model") and hasattr(model.model, "layers"):
         layers = model.model.layers
@@ -71,7 +76,6 @@ def train_corrector(
             for param in layer.parameters():
                 param.requires_grad = True
 
-    # Unfreeze lm_head
     if hasattr(model, "lm_head"):
         for param in model.lm_head.parameters():
             param.requires_grad = True
@@ -81,9 +85,22 @@ def train_corrector(
     print(f"Trainable parameters: {trainable:,} / {total:,} ({100*trainable/total:.1f}%)")
 
     # Generate training data
-    print("Generating training pairs...")
-    pairs = generate_training_pairs(SAMPLE_NAMES, num_augmentations=num_augmentations, error_rate=error_rate)
-    print(f"Generated {len(pairs)} training pairs")
+    print("Generating synthetic training pairs...")
+    pairs = generate_training_pairs(
+        SENTENCE_CORPUS,
+        num_augmentations=num_augmentations,
+        error_rate=error_rate,
+    )
+    print(f"Synthetic pairs: {len(pairs)}")
+
+    if real_ocr_pairs:
+        # Oversample real pairs to balance with synthetic (real errors are more valuable)
+        oversample = max(1, len(pairs) // len(real_ocr_pairs))
+        real_oversampled = real_ocr_pairs * oversample
+        pairs.extend(real_oversampled)
+        print(f"Real OCR pairs: {len(real_ocr_pairs)} (oversampled to {len(real_oversampled)})")
+
+    print(f"Total training pairs: {len(pairs)}")
 
     dataset = OCRCorrectionDataset(pairs, tokenizer, max_length=max_length)
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
@@ -130,4 +147,24 @@ def train_corrector(
 
 
 if __name__ == "__main__":
-    train_corrector(num_epochs=3)
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model", default="google/gemma-2-2b-it")
+    parser.add_argument("--epochs", type=int, default=3)
+    parser.add_argument("--batch-size", type=int, default=4)
+    parser.add_argument("--lr", type=float, default=2e-4)
+    parser.add_argument("--augmentations", type=int, default=10)
+    parser.add_argument("--error-rate", type=float, default=0.15)
+    parser.add_argument("--device", default=None)
+    args = parser.parse_args()
+
+    train_corrector(
+        model_name=args.model,
+        num_epochs=args.epochs,
+        batch_size=args.batch_size,
+        learning_rate=args.lr,
+        num_augmentations=args.augmentations,
+        error_rate=args.error_rate,
+        device=args.device,
+    )
